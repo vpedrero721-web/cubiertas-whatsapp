@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prototipo | Asistente Mueblería</title>
+    <style>
+      :root {
+        font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+        color: #172b25;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: #e9efec;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+      }
+
+      .phone {
+        width: min(100%, 470px);
+        height: min(850px, 100dvh);
+        display: flex;
+        flex-direction: column;
+        background: #f5f2ea;
+        box-shadow: 0 14px 45px #193b2c30;
+      }
+
+      .head {
+        background: #075e4a;
+        color: white;
+        padding: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .avatar {
+        border-radius: 50%;
+        background: #cce8dc;
+        color: #075e4a;
+        padding: 10px;
+        font-weight: 800;
+      }
+
+      .head small {
+        display: block;
+        color: #d0e6dc;
+      }
+
+      .messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 18px 13px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        background: linear-gradient(#f5f2eadd, #f5f2eadd),
+          repeating-linear-gradient(35deg, #e4e8de 0 2px, transparent 2px 45px);
+      }
+
+      .bubble {
+        max-width: 87%;
+        padding: 11px 13px;
+        border-radius: 13px;
+        line-height: 1.45;
+        font-size: 14px;
+        white-space: pre-line;
+        box-shadow: 0 1px 3px #0001;
+      }
+
+      .bot {
+        align-self: flex-start;
+        background: white;
+        border-top-left-radius: 3px;
+      }
+
+      .me {
+        align-self: flex-end;
+        background: #d8f8dd;
+        border-top-right-radius: 3px;
+      }
+
+      .actions {
+        padding: 10px 12px;
+        background: #fff;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 7px;
+        border-top: 1px solid #dfe6e0;
+        max-height: 235px;
+        overflow-y: auto;
+      }
+
+      .chat-form {
+        display: flex;
+        gap: 8px;
+        padding: 10px 12px;
+        background: #fff;
+        border-top: 1px solid #dfe6e0;
+      }
+
+      .chat-form .field {
+        min-width: 0;
+      }
+
+      button {
+        border: 1px solid #a8d1c0;
+        border-radius: 18px;
+        padding: 10px 12px;
+        background: #effaf4;
+        color: #075e4a;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #d7f2e3;
+      }
+
+      .map-link {
+        display: inline-block;
+        border: 1px solid #a8d1c0;
+        border-radius: 18px;
+        padding: 10px 12px;
+        background: #effaf4;
+        color: #075e4a;
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      .map-link:hover {
+        background: #d7f2e3;
+      }
+
+      button.primary {
+        background: #087b5b;
+        color: white;
+      }
+
+      .foot {
+        padding: 10px 14px;
+        font-size: 11px;
+        text-align: center;
+        background: #fff;
+        color: #65766e;
+      }
+
+      .field {
+        width: 100%;
+        padding: 11px;
+        border: 1px solid #b8cbc2;
+        border-radius: 9px;
+        font: inherit;
+      }
+
+      .form {
+        display: grid;
+        gap: 8px;
+        width: 100%;
+      }
+
+      .hint {
+        font-size: 12px;
+        color: #53685c;
+      }
+
+      .reset {
+        margin-left: auto;
+        background: #ffffff20;
+        border-color: #ffffff70;
+        color: white;
+        padding: 7px 10px;
+      }
+
+      @media (min-width: 600px) {
+        .phone {
+          border-radius: 18px;
+          overflow: hidden;
+          margin: 20px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <main class="phone">
+      <header class="head">
+        <div class="avatar">M</div>
+        <div>
+          <strong>Asistente de Mueblería</strong>
+          <small>Demostración académica · Temuco</small>
+        </div>
+        <button class="reset" id="restart">Reiniciar</button>
+      </header>
+
+      <section class="messages" id="messages" aria-live="polite"></section>
+      <section class="actions" id="actions" aria-label="Opciones de conversación"></section>
+      <form class="chat-form" id="chatForm">
+        <input class="field" id="chatInput" autocomplete="off" aria-label="Escribe un mensaje" placeholder="Escribe una opción o /asesor" />
+        <button class="primary" type="submit">Enviar</button>
+      </form>
+
+      <footer class="foot">Prototipo simulado · No conectado a WhatsApp · Valores ficticios</footer>
+    </main>
+
+    <script>
+      const messages = document.querySelector('#messages');
+      const actions = document.querySelector('#actions');
+      const chatForm = document.querySelector('#chatForm');
+      const chatInput = document.querySelector('#chatInput');
+
+      const money = (n) =>
+        new Intl.NumberFormat('es-CL', {
+          style: 'currency',
+          currency: 'CLP',
+          maximumFractionDigits: 0,
+        }).format(n);
+
+      const MAX_AUTOMATIC_METERS = 3.66;
+      const QUOTE_VALIDITY_DAYS = 15;
+      let selectedProduct = null;
+      let step = 'menu';
+
+      // Valores de demostración: reemplazar por la lista de precios aprobada por el negocio.
+      const catalogProducts = [
+        {
+          id: 'mdf-blanco',
+          name: 'Cubierta postformada blanca',
+          material: 'MDF',
+          finish: 'Blanco liso',
+          pricePerMeter: 39990,
+          visual: '⬜',
+          technicalSheet: 'MDF con laminado decorativo blanco. Ficha técnica por confirmar con el taller.',
+        },
+        {
+          id: 'mdf-madera',
+          name: 'Cubierta postformada madera',
+          material: 'MDF',
+          finish: 'Textura madera',
+          pricePerMeter: 44990,
+          visual: '🪵',
+          technicalSheet: 'MDF con laminado decorativo tipo madera. Ficha técnica por confirmar con el taller.',
+        },
+        {
+          id: 'mdf-grafito',
+          name: 'Cubierta postformada grafito',
+          material: 'MDF',
+          finish: 'Grafito',
+          pricePerMeter: 46990,
+          visual: '⬛',
+          technicalSheet: 'MDF con laminado decorativo grafito. Ficha técnica por confirmar con el taller.',
+        },
+      ];
+
+      const addOnPrices = {
+        cut45: { label: 'Corte a 45°', unitPrice: 5000 },
+        edgeBanding: { label: 'Pegado de cenefa', unitPrice: 3500 },
+        perforation: { label: 'Perforación para lavaplatos/encimera', unitPrice: 8000 },
+      };
+
+      function calculateQuote(product, meters, cantidad_cortes_45, cantidad_perforaciones, cantidad_pegados_cenefa = 0) {
+        if (!product || !Number.isFinite(product.pricePerMeter) || product.pricePerMeter < 0) {
+          throw new TypeError('Selecciona un producto válido del catálogo.');
+        }
+        if (!Number.isFinite(meters) || meters <= 0) {
+          throw new RangeError('Los metros deben ser un número mayor que cero.');
+        }
+
+        [
+          ['cortes a 45°', cantidad_cortes_45],
+          ['perforaciones', cantidad_perforaciones],
+          ['pegados de cenefa', cantidad_pegados_cenefa],
+        ].forEach(([label, quantity]) => {
+          if (!Number.isInteger(quantity) || quantity < 0) {
+            throw new RangeError(`La cantidad de ${label} debe ser un entero igual o mayor que cero.`);
+          }
+        });
+
+        const lines = [
+          {
+            description: `${product.name} (${meters} m × ${money(product.pricePerMeter)}/m)`,
+            quantity: meters,
+            unitPrice: product.pricePerMeter,
+            total: Math.round(meters * product.pricePerMeter),
+          },
+          {
+            description: addOnPrices.cut45.label,
+            quantity: cantidad_cortes_45,
+            unitPrice: addOnPrices.cut45.unitPrice,
+            total: cantidad_cortes_45 * addOnPrices.cut45.unitPrice,
+          },
+          {
+            description: addOnPrices.edgeBanding.label,
+            quantity: cantidad_pegados_cenefa,
+            unitPrice: addOnPrices.edgeBanding.unitPrice,
+            total: cantidad_pegados_cenefa * addOnPrices.edgeBanding.unitPrice,
+          },
+          {
+            description: addOnPrices.perforation.label,
+            quantity: cantidad_perforaciones,
+            unitPrice: addOnPrices.perforation.unitPrice,
+            total: cantidad_perforaciones * addOnPrices.perforation.unitPrice,
+          },
+        ];
+
+        return {
+          product,
+          meters,
+          lines,
+          total: lines.reduce((sum, line) => sum + line.total, 0),
+          currency: 'CLP',
+          validForDays: QUOTE_VALIDITY_DAYS,
+        };
+      }
+
+      function say(text, who = 'bot') {
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble ' + who;
+        bubble.textContent = text;
+        messages.appendChild(bubble);
+        messages.scrollTop = messages.scrollHeight;
+      }
+
+      function clear() {
+        actions.replaceChildren();
+      }
+
+      function btn(label, fn, primary = false) {
+        const button = document.createElement('button');
+        button.textContent = label;
+
+        if (primary) {
+          button.className = 'primary';
+        }
+
+        button.onclick = () => {
+          say(label, 'me');
+          fn();
+        };
+
+        actions.appendChild(button);
+      }
+
+      function back() {
+        btn('↩ Menú principal', menu);
+      }
+
+      function menu() {
+        step = 'menu';
+        clear();
+        say('¡Hola! 👋 Soy el asistente virtual de nuestra mueblería. ¿En qué puedo ayudarte?');
+        btn('🪑 Ver catálogo', catalog);
+        btn('🧮 Solicitar precotización', quote);
+        btn('❓ Preguntas frecuentes', faq);
+        btn('📍 Ubicación', locationInfo);
+        btn('👤 Atención humana', human);
+      }
+
+      function showProductOptions(message = 'Paso 1 de 3 · Elige el tipo de cubierta y terminación:') {
+        step = 'material';
+        clear();
+        say(message);
+        catalogProducts.forEach((product, index) => {
+          btn(`${product.visual} ${index + 1}. ${product.name} · ${money(product.pricePerMeter)}/m`, () => {
+            selectedProduct = product;
+            say(`${product.name} · Material: ${product.material} · Terminación: ${product.finish}\n${product.technicalSheet}`);
+            showDimensions();
+          });
+        });
+        back();
+      }
+
+      function catalog() {
+        clear();
+        say('Catálogo de demostración. Selecciona una terminación para ver su ficha y continuar con la precotización:');
+        catalogProducts.forEach((product) => {
+          btn(`${product.visual} ${product.name} · ${product.finish}`, () => {
+            selectedProduct = product;
+            say(`${product.name}\nMaterial: ${product.material}\nTerminación: ${product.finish}\nPrecio referencial: ${money(product.pricePerMeter)}/m\n${product.technicalSheet}`);
+            showDimensions();
+          });
+        });
+        back();
+      }
+
+      function paymentInfo(method, price, size) {
+        clear();
+
+        if (method === 'transferencia') {
+          say(
+            `Elegiste pagar con transferencia.\nTamaño del pedido: ${size}.\nTotal de referencia: ${money(price)} CLP.\n\n` +
+              'DATOS DE TRASFERENCIA\n' +
+              'Banco: Banco Estado \n' +
+              'Titular: "Nombre del cliente"\n' +
+              'RUT: 00.000.000-0\n' +
+              'Tipo de cuenta: Cuenta vista\n' +
+              'Número de cuenta: 000000000'
+          );
+        } else {
+          say(
+            `Elegiste pagar en efectivo.\nTamaño del pedido: ${size}.\nTotal de referencia: ${money(price)} CLP.\n\n` +
+              'Puedes dirigirte al local para realizar el pago.'
+          );
+        }
+
+        const mapLink = document.createElement('a');
+        mapLink.className = 'map-link';
+        mapLink.href = 'https://www.google.com/maps/place/Cubiertas+Postformadas+Temuco/@-38.742235,-72.5778153,17z/data=!4m16!1m9!3m8!1s0x9614d38f70d31b6d:0x42c57fc315ccaf97!2sCubiertas+Postformadas+Temuco!8m2!3d-38.742235!4d-72.5778153!9m1!1b1!16s%2Fg%2F11gl20pj7b!3m5!1s0x9614d38f70d31b6d:0x42c57fc315ccaf97!8m2!3d-38.742235!4d-72.5778153!16s%2Fg%2F11gl20pj7b?entry=ttu&g_ep=EgoyMDI2MTAyMC4wIKXMDSoASAFQAw%3D%3D';
+        mapLink.target = '_blank';
+        mapLink.rel = 'noopener noreferrer';
+        mapLink.textContent = '📍 Ver ubicación en Google Maps';
+        actions.appendChild(mapLink);
+
+        btn('🧮 Otra precotización', quote);
+        back();
+      }
+
+      function faq() {
+        step = 'faq';
+        clear();
+        say('Selecciona tu consulta:');
+
+        btn('Materiales', () => {
+          clear();
+          say('Podemos orientar sobre melamina y MDF. La disponibilidad y terminaciones deben confirmarse con el taller.');
+          back();
+        });
+
+        btn('Plazos de entrega', () => {
+          clear();
+          say('Los plazos dependen del diseño y la carga de trabajo. Un trabajador debe confirmarlos.');
+          back();
+        });
+
+        btn('¿El precio es definitivo?', () => {
+          clear();
+          say('No. Las precotizaciones son estimaciones de demostración y deben validarse antes de confirmar un pedido.');
+          back();
+        });
+
+        back();
+      }
+
+      function locationInfo() {
+        step = 'location';
+        clear();
+        say('Este prototipo está pensado para una mueblería de Temuco. La dirección y los horarios reales aún no se han configurado.');
+        back();
+      }
+
+      function human(reason = '') {
+        step = 'human';
+        clear();
+        say(`${reason ? `${reason}\n\n` : ''}Derivación a un asesor humano solicitada. Esta demostración no está conectada a WhatsApp ni a un sistema de atención; puedes registrar la solicitud simulada aquí.`);
+
+        btn('Registrar solicitud simulada', () => {
+          clear();
+          say('Solicitud simulada registrada en esta conversación. En producción, este paso debe enviar el caso y sus medidas al equipo de atención.');
+          back();
+        });
+
+        back();
+      }
+
+      function quote() {
+        selectedProduct = null;
+        showProductOptions();
+      }
+
+      function showDimensions(message = 'Paso 2 de 3 · Ingresa las medidas y adicionales. El largo debe ser de hasta 3,66 m para una precotización automática.') {
+        step = 'dimensions';
+        clear();
+        say(message);
+        const form = document.createElement('form');
+        form.className = 'form';
+        form.innerHTML = `
+          <label>
+            Largo de cubierta (m)
+            <input class="field" name="meters" type="number" min="0.01" step="0.01" required placeholder="Ej.: 2,40" />
+          </label>
+          <label>Cantidad de cortes a 45°
+            <input class="field" name="cuts45" type="number" min="0" step="1" value="0" required />
+          </label>
+          <label>Cantidad de pegados de cenefa
+            <input class="field" name="edgeband" type="number" min="0" step="1" value="0" required />
+          </label>
+          <label>Cantidad de perforaciones
+            <input class="field" name="perforations" type="number" min="0" step="1" value="0" required />
+          </label>
+          <span class="hint">Precios referenciales ficticios para demostración. El taller debe confirmar disponibilidad, medidas y precio final.</span>
+          <button class="primary" type="submit">Paso 3 · Calcular precotización</button>
+        `;
+
+        form.onsubmit = (e) => {
+          e.preventDefault();
+          const formData = new FormData(form);
+          const meters = Number(formData.get('meters'));
+          const cuts45 = Number(formData.get('cuts45'));
+          const edgeband = Number(formData.get('edgeband'));
+          const perforations = Number(formData.get('perforations'));
+
+          if (meters > MAX_AUTOMATIC_METERS) {
+            human(`La medida ingresada (${meters} m) supera el máximo automático de ${MAX_AUTOMATIC_METERS} m. Un asesor debe revisar este pedido especial.`);
+            return;
+          }
+
+          try {
+            const result = calculateQuote(selectedProduct, meters, cuts45, perforations, edgeband);
+            say(`${meters} m · ${cuts45} corte(s) a 45° · ${edgeband} pegado(s) de cenefa · ${perforations} perforación(es)`, 'me');
+            showQuote(result);
+          } catch (error) {
+            if (!(error instanceof RangeError || error instanceof TypeError)) {
+              throw error;
+            }
+            showDimensions(`No se pudo calcular: ${error.message}\n\nCorrige los datos para continuar.`);
+          }
+        };
+
+        actions.appendChild(form);
+        back();
+      }
+
+      function showQuote(result) {
+        step = 'quote';
+        clear();
+        const lineSummary = result.lines
+          .map((line) => `${line.description}: ${money(line.total)}`)
+          .join('\n');
+        say(
+          `Paso 3 de 3 · Precotización referencial\n${result.product.name}\n\n` +
+            `${lineSummary}\n\nTOTAL: ${money(result.total)} CLP\n\n` +
+            `Validez: ${result.validForDays} días desde hoy. Valores ficticios de demostración; no constituye una cotización definitiva.`
+        );
+        btn('👤 Consultar con un asesor', () => human('El cliente solicita validar esta precotización.'));
+        btn('🧮 Nueva precotización', quote);
+        back();
+      }
+
+      function menuWithError() {
+        menu();
+        say('Opción no válida. Usa los botones o escribe 1 para catálogo, 2 para precotizar, 3 para preguntas frecuentes o /asesor.');
+      }
+
+      function handleMessage(rawMessage) {
+        const message = rawMessage.trim();
+        const normalized = message.toLocaleLowerCase('es-CL');
+        if (!message) return;
+        say(message, 'me');
+
+        if (['/asesor', '/humano', 'asesor', 'asesor humano', 'humano'].includes(normalized)) {
+          human();
+          return;
+        }
+
+        if (normalized.includes('laboratorio')) {
+          human('Los mesones de laboratorio requieren revisión personalizada por un asesor.');
+          return;
+        }
+
+        if (step === 'menu') {
+          if (normalized === '1' || normalized.includes('catálogo') || normalized.includes('catalogo')) {
+            catalog();
+          } else if (normalized === '2' || normalized.includes('precotiz')) {
+            quote();
+          } else if (normalized === '3' || normalized.includes('pregunta')) {
+            faq();
+          } else {
+            menuWithError();
+          }
+          return;
+        }
+
+        if (step === 'material') {
+          const index = Number(message) - 1;
+          const product = catalogProducts.find((item) => item.id === normalized) || catalogProducts[index] ||
+            catalogProducts.find((item) => item.name.toLocaleLowerCase('es-CL') === normalized);
+          if (!product) {
+            showProductOptions('Opción inválida. Elige una de las terminaciones disponibles (1, 2 o 3):');
+            return;
+          }
+          selectedProduct = product;
+          say(`${product.name} · Material: ${product.material} · Terminación: ${product.finish}`);
+          showDimensions();
+          return;
+        }
+
+        if (step === 'dimensions') {
+          showDimensions('Para medidas y adicionales, completa el formulario. Puedes escribir /asesor para solicitar ayuda humana.');
+          return;
+        }
+
+        if (step === 'human') {
+          say('La solicitud de atención humana está seleccionada. Usa el botón para registrar la solicitud simulada.');
+          return;
+        }
+
+        menuWithError();
+      }
+
+      chatForm.onsubmit = (event) => {
+        event.preventDefault();
+        const message = chatInput.value;
+        chatInput.value = '';
+        handleMessage(message);
+      };
+
+      document.querySelector('#restart').onclick = () => {
+        messages.replaceChildren();
+        selectedProduct = null;
+        menu();
+      };
+
+      menu();
+    </script>
+  </body>
+</html>
